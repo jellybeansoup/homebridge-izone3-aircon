@@ -1,116 +1,119 @@
 import { API, DynamicPlatformPlugin, Logger, PlatformAccessory, PlatformConfig, Service, Characteristic } from 'homebridge';
-
+import { iZone, System, Zone, ZoneType } from './izone';
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
-import { ExamplePlatformAccessory } from './platformAccessory';
+import { SystemAccessory } from './systemAccessory';
+import { ZoneAccessory } from './zoneAccessory';
 
-/**
- * HomebridgePlatform
- * This class is the main constructor for your plugin, this is where you should
- * parse the user config and discover/register accessories with Homebridge.
- */
-export class ExampleHomebridgePlatform implements DynamicPlatformPlugin {
-  public readonly Service: typeof Service = this.api.hap.Service;
-  public readonly Characteristic: typeof Characteristic = this.api.hap.Characteristic;
+export class AirConditionerPlatform implements DynamicPlatformPlugin {
+	public readonly Service: typeof Service = this.api.hap.Service;
+	public readonly Characteristic: typeof Characteristic = this.api.hap.Characteristic;
 
-  // this is used to track restored cached accessories
-  public readonly accessories: PlatformAccessory[] = [];
+	public readonly platformAccessories: Record<string, PlatformAccessory> = {};
+	public systemAccessory?: SystemAccessory;
+	public readonly zoneAccessories: Record<string, ZoneAccessory> = {};
 
-  constructor(
-    public readonly log: Logger,
-    public readonly config: PlatformConfig,
-    public readonly api: API,
-  ) {
-    this.log.debug('Finished initializing platform:', this.config.name);
+	public izone: iZone;
 
-    // When this event is fired it means Homebridge has restored all cached accessories from disk.
-    // Dynamic Platform plugins should only register new accessories after this event was fired,
-    // in order to ensure they weren't added to homebridge already. This event can also be used
-    // to start discovery of new accessories.
-    this.api.on('didFinishLaunching', () => {
-      log.debug('Executed didFinishLaunching callback');
-      // run the method to discover / register your devices as accessories
-      this.discoverDevices();
-    });
-  }
+	private readonly _unregister = false;
 
-  /**
-   * This function is invoked when homebridge restores cached accessories from disk at startup.
-   * It should be used to setup event handlers for characteristics and update respective values.
-   */
-  configureAccessory(accessory: PlatformAccessory) {
-    this.log.info('Loading accessory from cache:', accessory.displayName);
+	constructor(
+		public readonly log: Logger,
+		public readonly config: PlatformConfig,
+		public readonly api: API,
+	) {
+		this.izone = new iZone(this.config.ip, log);
+		this.izone.refreshMilliseconds = this.config.updateInterval || 60_000;
 
-    // add the restored accessory to the accessories cache so we can track if it has already been registered
-    this.accessories.push(accessory);
-  }
+		this.api.on('didFinishLaunching', () => {
+			log.debug(`Finished initializing. Refresh rate: ${this.izone.refreshMilliseconds / 1_000}s.`);
 
-  /**
-   * This is an example method showing how to register discovered accessories.
-   * Accessories must only be registered once, previously created accessories
-   * must not be registered again to prevent "duplicate UUID" errors.
-   */
-  discoverDevices() {
+			this.izone.beginBackgroundRefresh( system => {
+				this.updateAccessories(system);
+			});
+		});
 
-    // EXAMPLE ONLY
-    // A real plugin you would discover accessories from the local network, cloud services
-    // or a user-defined array in the platform config.
-    const exampleDevices = [
-      {
-        exampleUniqueId: 'ABCD',
-        exampleDisplayName: 'Bedroom',
-      },
-      {
-        exampleUniqueId: 'EFGH',
-        exampleDisplayName: 'Kitchen',
-      },
-    ];
+		this.api.on('shutdown', () => {
+			this.izone.endBackgroundRefresh();
+		});
+	}
 
-    // loop over the discovered devices and register each one if it has not already been registered
-    for (const device of exampleDevices) {
+	configureAccessory(
+		accessory: PlatformAccessory,
+	) {
+		this.log.info(`Found cached zone: ${accessory.displayName}`);
+		this.platformAccessories[accessory.UUID] = accessory;
+	}
 
-      // generate a unique id for the accessory this should be generated from
-      // something globally unique, but constant, for example, the device serial
-      // number or MAC address
-      const uuid = this.api.hap.uuid.generate(device.exampleUniqueId);
+	updateAccessories(
+		system: System,
+	) {
+		this.updateSystemAccessory(system);
 
-      // see if an accessory with the same uuid has already been registered and restored from
-      // the cached devices we stored in the `configureAccessory` method above
-      const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
+		for (const zone of system.zones) {
+			this.updateZoneAccessory(zone, system);
+		}
+	}
 
-      if (existingAccessory) {
-        // the accessory already exists
-        this.log.info('Restoring existing accessory from cache:', existingAccessory.displayName);
+	private updateSystemAccessory(
+		system: System,
+	) {
+		const uuid = this.api.hap.uuid.generate(system.deviceUID);
+		const existingPlatformAccessory = this.platformAccessories[uuid];
+		const existingSystemAccessory = this.systemAccessory;
 
-        // if you need to update the accessory.context then you should run `api.updatePlatformAccessories`. eg.:
-        // existingAccessory.context.device = device;
-        // this.api.updatePlatformAccessories([existingAccessory]);
+		if (this._unregister) {
+			if (existingPlatformAccessory) {
+				this.log.info('Removing system.');
+				delete this.zoneAccessories[uuid];
+				delete this.platformAccessories[uuid];
+				this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingPlatformAccessory]);
+			}
+		} else if (existingPlatformAccessory) {
+			if (existingSystemAccessory) {
+				existingSystemAccessory.system = system;
+				existingSystemAccessory.update();
+			} else {
+				this.systemAccessory = new SystemAccessory(system, this, existingPlatformAccessory);
+			}
+		} else {
+			this.log.info('Found system.');
+			const accessory = new this.api.platformAccessory(this.config.name || system.tag1, uuid);
+			this.systemAccessory = new SystemAccessory(system, this, accessory);
+			this.platformAccessories[uuid] = accessory;
+			this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
+		}
+	}
 
-        // create the accessory handler for the restored accessory
-        // this is imported from `platformAccessory.ts`
-        new ExamplePlatformAccessory(this, existingAccessory);
+	private updateZoneAccessory(
+		zone: Zone,
+		system: System,
+	) {
+		const uuid = this.api.hap.uuid.generate(`${zone.deviceUID}-${zone.index}`);
+		const existingPlatformAccessory = this.platformAccessories[uuid];
+		const existingZoneAccessory = this.zoneAccessories[uuid];
 
-        // it is possible to remove platform accessories at any time using `api.unregisterPlatformAccessories`, eg.:
-        // remove platform accessories when no longer present
-        // this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingAccessory]);
-        // this.log.info('Removing existing accessory from cache:', existingAccessory.displayName);
-      } else {
-        // the accessory does not yet exist, so we need to create it
-        this.log.info('Adding new accessory:', device.exampleDisplayName);
+		if (this._unregister) {
+			if (existingPlatformAccessory) {
+				this.log.info(`Removing zone: ${zone.name}`);
+				delete this.zoneAccessories[uuid];
+				delete this.platformAccessories[uuid];
+				this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingPlatformAccessory]);
+			}
+		} else if (existingPlatformAccessory) {
+			if (existingZoneAccessory) {
+				existingZoneAccessory.system = system;
+				existingZoneAccessory.zone = zone;
+				existingZoneAccessory.update();
+			} else {
+				this.zoneAccessories[uuid] = new ZoneAccessory(system, zone, this, existingPlatformAccessory);
+			}
+		} else if (zone.type !== ZoneType.constant) {
+			this.log.info(`Found new zone: ${zone.name}`);
+			const accessory = new this.api.platformAccessory(zone.name, uuid);
+			this.zoneAccessories[uuid] = new ZoneAccessory(system, zone, this, accessory);
+			this.platformAccessories[uuid] = accessory;
+			this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
+		}
+	}
 
-        // create a new accessory
-        const accessory = new this.api.platformAccessory(device.exampleDisplayName, uuid);
-
-        // store a copy of the device object in the `accessory.context`
-        // the `context` property can be used to store any data about the accessory you may need
-        accessory.context.device = device;
-
-        // create the accessory handler for the newly create accessory
-        // this is imported from `platformAccessory.ts`
-        new ExamplePlatformAccessory(this, accessory);
-
-        // link the accessory to your platform
-        this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
-      }
-    }
-  }
 }
