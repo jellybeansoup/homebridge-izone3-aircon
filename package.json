@@ -1,5 +1,4 @@
 {
-	"private": true,
 	"displayName": "iZone3 Air Conditioner",
 	"name": "homebridge-izone3-aircon",
 	"version": "1.0.0",
