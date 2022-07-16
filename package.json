@@ -1,7 +1,7 @@
 {
 	"displayName": "iZone3 Air Conditioner",
 	"name": "homebridge-izone3-aircon",
-	"version": "1.0.0",
+	"version": "1.0.1-beta.0",
 	"description": "Homebridge plugin for the iZone 3 Air Conditioner controller",
 	"license": "Apache-2.0",
 	"repository": {
