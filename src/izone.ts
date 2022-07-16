@@ -162,7 +162,7 @@ export class iZone {
 			'ZoneNo': (zoneIndex + 1).toString(),
 			'Command': command,
 		})
-			.then( response => {
+			.then( () => {
 				return this.getZones(system.numberOfZones);
 			})
 			.then( zones => {

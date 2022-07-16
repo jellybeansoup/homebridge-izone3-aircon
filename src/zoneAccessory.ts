@@ -1,5 +1,5 @@
-import { Service, PlatformAccessory, Characteristic, CharacteristicValue } from 'homebridge';
-import { iZone, System, SystemMode, Zone, ZoneType, ZoneMode } from './izone';
+import { PlatformAccessory, CharacteristicValue } from 'homebridge';
+import { System, SystemMode, Zone, ZoneType, ZoneMode } from './izone';
 import { AirConditionerPlatform } from './platform';
 
 export class ZoneAccessory {
