@@ -1,3 +1,31 @@
+# Homebridge iZone/MyZone 3 Air Conditioner
+
+A plugin for [Homebridge](https://homebridge.io) which allows you to control your iZone air conditioner system with HomeKit.
+
+This plugin uses v1.0 of the iZone 3, and should support most (if not all) air conditioners which use that system. It doesn't currently support any systems that use any of the v2 endpoints.
+
+## Installation
+
+1. Install homebridge using: `npm install -g homebridge`
+2. Install this plugin using: `npm install -g homebridge-izone3-aircon`
+3. Update your `config.json` file using the example snippet below as a guide.
+
+## Configuration
+
+Configuration sample (edit `~homebridge/config.json`):
+
+```json
+{
+	"platforms": [
+		{
+		"platform": "iZone3AirConditioner",
+		"name": "Air Conditioner",
+		"ip": "192.168.181.4",
+		"updateInterval": 10000
+		}
+	]
+}
+``` 
 
 <p align="center">
 
