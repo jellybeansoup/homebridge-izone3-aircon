@@ -63,10 +63,16 @@ export class SystemAccessory {
 	}
 
 	public update() {
-		const service = this.accessory.getService(this.platform.Service.Thermostat);
+		const service = this.accessory.getService(this.platform.Service.HeaterCooler);
 
 		if (service) {
-			service.getCharacteristic(this.platform.Characteristic.TargetTemperature)
+			service.getCharacteristic(this.platform.Characteristic.HeatingThresholdTemperature)
+				.setProps({
+					maxValue: this.system.economyLock ? this.system.economyMaximumTemp : 30,
+					minValue: this.system.economyLock ? this.system.economyMinimumTemp : 15,
+				});
+
+			service.getCharacteristic(this.platform.Characteristic.CoolingThresholdTemperature)
 				.setProps({
 					maxValue: this.system.economyLock ? this.system.economyMaximumTemp : 30,
 					minValue: this.system.economyLock ? this.system.economyMinimumTemp : 15,
