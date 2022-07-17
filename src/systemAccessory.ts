@@ -32,9 +32,9 @@ export class SystemAccessory {
 
 		service.getCharacteristic(this.platform.Characteristic.RotationSpeed)
 			.setProps({
-				maxValue: 3,
+				maxValue: 100,
 				minValue: 0,
-				minStep: 1,
+				minStep: 25,
 			})
 			.onGet(this.getRotationSpeed.bind(this))
 			.onSet(this.setRotationSpeed.bind(this));
@@ -167,47 +167,41 @@ export class SystemAccessory {
 
 	private getRotationSpeed(): CharacteristicValue {
 		switch (this.system.fanSpeed) {
-		case FanSpeed.auto: {
-			return 0;
-		}
 		case FanSpeed.low: {
-			return 1;
+			return 25;
 		}
 		case FanSpeed.medium: {
-			return 2;
+			return 50;
 		}
 		case FanSpeed.high: {
-			return 3;
+			return 75;
+		}
+		case FanSpeed.auto: {
+			return 100;
 		}
 		}
 	}
 
 	private setRotationSpeed(value: CharacteristicValue) {
-		let promise: Promise<any>;
+		let fanSpeed: FanSpeed;
 
-		switch (value) {
-		case 0: {
-			promise = this.platform.izone.setFanSpeed(FanSpeed.auto);
-			break;
-		}
-		case 1: {
-			promise = this.platform.izone.setFanSpeed(FanSpeed.low);
-			break;
-		}
-		case 2: {
-			promise = this.platform.izone.setFanSpeed(FanSpeed.medium);
-			break;
-		}
-		case 3: {
-			promise = this.platform.izone.setFanSpeed(FanSpeed.high);
-			break;
-		}
-		default: {
+		if (value >= 87.5) {
+			fanSpeed = FanSpeed.auto;
+		} else if (value >= 62.5) {
+			fanSpeed = FanSpeed.high;
+		} else if (value >= 37.5) {
+			fanSpeed = FanSpeed.medium;
+		} else if (value >= 12.5) {
+			fanSpeed = FanSpeed.low;
+		} else {
 			return;
 		}
+
+		if (this.system.fanSpeed === fanSpeed) {
+			return;
 		}
 
-		promise
+		this.platform.izone.setFanSpeed(fanSpeed)
 			.catch( error => {
 				this.platform.log.error(`Unable to change fan speed: ${error}`);
 			});
