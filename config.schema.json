@@ -1,7 +1,7 @@
 {
 	"pluginAlias": "iZone3AirConditioner",
 	"pluginType": "platform",
-	"headerDisplay": "This plugin supports iZone and MyZone air conditioner systems using version 1 of the API.",
+	"headerDisplay": "This plugin supports iZone 3 and MyZone 3 air conditioner systems using v1.0 of the API.",
 	"footerDisplay": "For help, please visit the [GitHub repository](https://github.com/jellybeansoup/homebridge-izone3-aircon).",
 	"singular": true,
 	"schema": {
@@ -12,21 +12,21 @@
 				"type": "string",
 				"required": true,
 				"default": "Air Conditioner"
-			}
+			},
 			"ip": {
 				"title": "IP Address",
 				"type": "string",
 				"required": true,
-				"placeholder": "XXX.XXX.XXX.XXX",
+				"placeholder": "192.168.XXX.XXX",
 				"format": "ipv4",
 				"description": "Local, static IP address of the controller."
 			},
 			"updateInterval": {
 				"title": "Update Interval",
 				"type": "integer",
-				"placeholder": "60000",
-				"description": "The interval (in milliseconds) at which updates of the zones are requested."
-			},
+				"description": "The interval (in milliseconds) at which updates of the zones are requested.",
+				"default": "60000"
+			}
 		}
 	}
 }
