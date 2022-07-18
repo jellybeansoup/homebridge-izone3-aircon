@@ -23,7 +23,12 @@
 		"prepublishOnly": "npm run lint && npm run build"
 	},
 	"keywords": [
-		"homebridge-plugin"
+		"homebridge-plugin",
+		"thermostat",
+		"airconditioner",
+		"heater-cooler",
+		"izone 3",
+		"myzone 3"
 	],
 	"dependencies": {
 		"axios": "^0.27.2"
