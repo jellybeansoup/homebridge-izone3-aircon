@@ -1,3 +1,5 @@
 {
-  "apexskier.eslint.config.fixOnSave" : "Enable"
+  "apexskier.eslint.config.fixOnSave" : "Enable",
+  "workspace.color" : 9,
+  "workspace.name" : "iZone 3 Air Conditioner"
 }
