@@ -16,14 +16,14 @@ Configuration sample (edit `~/homebridge/config.json`):
 
 ```json
 {
-	"platforms": [
-		{
-			"platform": "iZone3AirConditioner",
-			"name": "Air Conditioner",
-			"ip": "XXX.XXX.XXX.XXX",
-			"updateInterval": 60000
-		}
-	]
+  "platforms": [
+    {
+      "platform": "iZone3AirConditioner",
+      "name": "Air Conditioner",
+      "ip": "XXX.XXX.XXX.XXX",
+      "updateInterval": 60000
+    }
+  ]
 }
 ```
 
@@ -37,18 +37,22 @@ You can also configure the `"updateInterval"` to get Homebridge to update with t
 
 The plugin registers a "Heater Cooler" accessory for the main system, and either a "Switch" or a "Thermostat" for all configured zones (depending on whether they have individual temperature controls).
 
-## System
+### System
 
-The system accessory allows you to enable and disable the entire system, select between "Heat", "Cool" and "Auto" modes ("Vent" and "Dry" are not available due to a limitation in Homekit), adjust the fan speed, and set the overall temperature. If the central heating/cooling unit is controlled by the zones (and the standard controller doesn't allow adjusting it directly), changing the temperature using this accessory will open and apply the selected temperature to all zones.
+The system accessory allows you to enable and disable the entire system, select between "Heat", "Cool" and "Auto" modes ("Vent" and "Dry" are not available due to a limitation in HomeKit), adjust the fan speed, and set the overall temperature.
 
-# Constant Zones
+If the central heating/cooling unit is controlled by the zones (and the standard controller doesn't allow adjusting it directly), changing the temperature using this accessory will open and apply the selected temperature to all zones.
+
+Home's fan speed slider is divided into five segments: off, low, medium, high, and auto. It's not an ideal scenario, but it's what HomeKit provides.
+
+### Constant Zones
 
 Constant zones are not currently supported.
 
-# Open/Close Zones
+### Open/Close Zones
 
 For any zones that provide the ability to open and close them, an accessory with a toggle switch is registered. As expected, this allows the individual zone to be opened and closed.
 
-# Climate Control Zones
+### Climate Control Zones
 
 For zones with thermostats, a temperature control is registered. This may be used to set the temperature for the selected zone, as well as toggle between the closed and climate control state. Setting the zone to the "open" state is not currently supported.
