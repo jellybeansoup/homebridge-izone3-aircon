@@ -31,7 +31,6 @@ export class iZone {
 			this.getSystem()
 				.then( system => {
 					this.system = system;
-					this.log.debug('System refreshed.');
 					this.refreshHandler(system);
 				})
 				.catch( error => {
@@ -51,15 +50,24 @@ export class iZone {
 	public getSystem(): Promise<System> {
 		let _system: System;
 
-		return this.axios
-			.get('http://' + this.ip + '/SystemSettings')
-			.then( response => {
-				_system = System.fromJSON(response.data);
+		return this.getSystemOnly()
+			.then( system => {
+				_system = system;
 				return this.getZones(_system.numberOfZones);
 			})
 			.then( zones => {
 				_system.zones = zones;
 				return _system;
+			});
+	}
+
+	public getSystemOnly(): Promise<System> {
+		return this.axios
+			.get('http://' + this.ip + '/SystemSettings')
+			.then( response => {
+				const json = response.data;
+				const system = System.fromJSON(json);
+				return system;
 			});
 	}
 
@@ -80,45 +88,153 @@ export class iZone {
 			});
 	}
 
-	public enableSystem(): Promise<System> {
-		return this.sendCommand('SystemON', 'on')
-			.then( () => {
-				return this.getSystem();
+	public enableSystem(): Promise<void> {
+		return this.getSystemOnly()
+			.then( system => {
+				if (system.isOn) {
+					this.log.debug('System is already on; ignoring request.');
+					return Promise.resolve();
+				}
+
+				return this.sendCommand('SystemON', 'on')
+					.then(this.getSystemOnly.bind(this))
+					.then( system => {
+						if (system.isOn) {
+							Promise.reject('UNKNOWN');
+						}
+
+						this.log.info('System has been turned on.');
+					});
 			});
 	}
 
-	public disableSystem(): Promise<System> {
-		return this.sendCommand('SystemON', 'off')
-			.then( () => {
-				return this.getSystem();
+	public disableSystem(): Promise<void> {
+		return this.getSystemOnly()
+			.then( system => {
+				if (!system.isOn) {
+					this.log.debug('System is already off; ignoring request.');
+					return Promise.resolve();
+				}
+
+				return this.sendCommand('SystemON', 'off')
+					.then(this.getSystemOnly.bind(this))
+					.then( system => {
+						if (system.isOn) {
+							Promise.reject('UNKNOWN');
+						}
+
+						this.log.info('System has been turned off.');
+					});
 			});
 	}
 
 	public setSystemMode(
 		mode: SystemMode,
-	): Promise<System> {
-		return this.sendCommand('SystemMODE', mode.toString())
-			.then( () => {
-				return this.getSystem();
+	): Promise<void> {
+		return this.getSystemOnly()
+			.then( system => {
+				if (system.mode === mode) {
+					this.log.debug(`System is already set to ${system.mode}; ignoring request.`);
+					return Promise.resolve();
+				}
+
+				return this.sendCommand('SystemMODE', mode.toString())
+					.then(this.getSystemOnly.bind(this))
+					.then( system => {
+						if (system.mode !== mode) {
+							Promise.reject('UNKNOWN');
+						}
+
+						this.log.info(`System set to ${system.mode}.`);
+					});
 			});
 	}
 
 	public setFanSpeed(
 		fanSpeed: FanSpeed,
-	): Promise<System> {
-		return this.sendCommand('SystemFAN', fanSpeed.toString())
-			.then( () => {
-				return this.getSystem();
+	): Promise<void> {
+		return this.getSystemOnly()
+			.then( system => {
+				if (system.fanSpeed === fanSpeed) {
+					this.log.debug(`Fan speed is already ${system.fanSpeed} for system; ignoring request.`);
+					return Promise.resolve();
+				}
+
+				return this.sendCommand('SystemFAN', fanSpeed.toString())
+					.then(this.getSystemOnly.bind(this))
+					.then( system => {
+						if (system.fanSpeed !== fanSpeed) {
+							Promise.reject('UNKNOWN');
+						}
+
+						this.log.info(`Fan speed set to ${system.fanSpeed} for system.`);
+					});
 			});
 	}
 
 	public setTargetTemp(
 		targetTemp: number,
-	): Promise<System> {
-		return this.sendCommand('UnitSetpoint', targetTemp.toString())
-			.then( () => {
-				return this.getSystem();
-			});
+	): Promise<void> {
+		const system = this.system;
+
+		if (!system) {
+			return Promise.reject('Invalid system');
+		}
+
+		if (system.usesSystemSetpoint) {
+			return this.getSystemOnly()
+				.then( system => {
+					if (system.targetTemp === targetTemp) {
+						this.log.debug(`Target temperature is already ${system.targetTemp}° for system; ignoring request.`);
+						return Promise.resolve();
+					}
+
+					return this.sendCommand('UnitSetpoint', targetTemp.toString())
+						.then(this.getSystemOnly.bind(this))
+						.then( system => {
+							if (system.targetTemp !== targetTemp) {
+								Promise.reject('UNKNOWN');
+							}
+
+							this.log.info(`Target temperature set to ${system.targetTemp} for system.`);
+						});
+				});
+		} else {
+			return this.getZones(system.numberOfZones)
+				.then( zones => {
+					const promises: Promise<any>[] = [];
+					const indices: Set<number> = new Set();
+
+					for (const zone of zones) {
+						if (zone.targetTemp === targetTemp) {
+							continue;
+						}
+
+						promises.push(this.zoneCommand(zone.index, targetTemp.toString()));
+						indices.add(zone.index);
+					}
+
+					return promises.reduce((p, promise) => {
+						return p.then(() => {
+							return promise;
+						});
+					}, Promise.resolve())
+						.then( () => {
+							return this.getZones(system.numberOfZones);
+						})
+						.then( zones => {
+							for (const zone of zones) {
+								if (!indices.has(zone.index)) {
+									continue;
+								} else if (zone.targetTemp === targetTemp) {
+									this.log.info(`'${zone.name}' zone set to ${zone.targetTemp}°.`);
+								} else {
+									this.log.error(`'${zone.name}' zone was not set to ${targetTemp}° for unknown reasons.`);
+								}
+							}
+						});
+				});
+		}
 	}
 
 	public getZones(
@@ -148,43 +264,62 @@ export class iZone {
 			});
 	}
 
+	public getZone(
+		zoneIndex: number,
+	): Promise<Zone> {
+		let promise: Promise<object>;
+		if (zoneIndex >= 8) {
+			promise = this.axios.get('http://' + this.ip + '/Zones9_12');
+		} else if (zoneIndex >= 4) {
+			promise = this.axios.get('http://' + this.ip + '/Zones5_8');
+		} else if (zoneIndex >= 0) {
+			promise = this.axios.get('http://' + this.ip + '/Zones1_4');
+		} else {
+			return Promise.reject('Invalid zone index.');
+		}
+
+		return promise
+			.then(results => {
+				const json = results['data'][zoneIndex % 4];
+				const zone = Zone.fromJSON(json);
+				return zone;
+			});
+	}
+
 	private zoneCommand(
 		zoneIndex: number,
 		command: string,
 	): Promise<Zone> {
-		const system = this.system;
-
-		if (!system) {
-			return Promise.reject('Invalid system.');
-		}
-
-		return this.sendCommand('ZoneCommand', {
+		const payload = {
 			'ZoneNo': (zoneIndex + 1).toString(),
 			'Command': command,
-		})
+		};
+
+		return this.sendCommand('ZoneCommand', payload)
 			.then( () => {
-				return this.getZones(system.numberOfZones);
-			})
-			.then( zones => {
-				return zones[zoneIndex];
+				return this.getZone(zoneIndex);
 			});
 	}
 
-	public openZone(
+	public setModeForZone(
+		zoneMode: ZoneMode,
 		zoneIndex: number,
 	): Promise<void> {
-		return this.zoneCommand(zoneIndex, 'open')
+		return this.getZone(zoneIndex)
 			.then( zone => {
-				this.log.info(zone.name + ' opened.');
-			});
-	}
+				if (zone.mode === zoneMode) {
+					this.log.debug(`'${zone.name}' zone is already ${zone.mode}; ignoring request.`);
+					return Promise.resolve();
+				}
 
-	public closeZone(
-		zoneIndex: number,
-	): Promise<void> {
-		return this.zoneCommand(zoneIndex, 'close')
-			.then( zone => {
-				this.log.info(zone.name + ' closed.');
+				return this.zoneCommand(zoneIndex, zoneMode)
+					.then( zone => {
+						if (zone.mode !== zoneMode) {
+							Promise.reject('UNKNOWN');
+						}
+
+						this.log.info(`'${zone.name}' zone set to ${zone.mode}.`);
+					});
 			});
 	}
 
@@ -192,9 +327,21 @@ export class iZone {
 		targetTemp: number,
 		zoneIndex: number,
 	): Promise<void> {
-		return this.zoneCommand(zoneIndex, targetTemp.toString())
+		return this.getZone(zoneIndex)
 			.then( zone => {
-				this.log.info(`${zone.name} set to ${zone.targetTemp} (${targetTemp})°.`);
+				if (zone.targetTemp === targetTemp) {
+					this.log.debug(`'${zone.name}' zone is already ${zone.targetTemp}°; ignoring request.`);
+					return Promise.resolve();
+				}
+
+				return this.zoneCommand(zoneIndex, targetTemp.toString())
+					.then( zone => {
+						if (zone.targetTemp !== targetTemp) {
+							Promise.reject('UNKNOWN');
+						}
+
+						this.log.info(`'${zone.name}' zone set to ${zone.targetTemp}°.`);
+					});
 			});
 	}
 

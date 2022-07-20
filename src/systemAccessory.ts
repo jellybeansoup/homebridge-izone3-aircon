@@ -88,12 +88,12 @@ export class SystemAccessory {
 	}
 
 	private setActive(value: CharacteristicValue) {
-		if (value && !this.system.isOn) {
+		if (value) {
 			this.platform.izone.enableSystem()
 				.catch( error => {
 					this.platform.log.error(`Unable to enable system: ${error}`);
 				});
-		} else if (!value && this.system.isOn) {
+		} else if (!value) {
 			this.platform.izone.disableSystem()
 				.catch( error => {
 					this.platform.log.error(`Unable to disable system: ${error}`);
@@ -197,10 +197,6 @@ export class SystemAccessory {
 			return;
 		}
 
-		if (this.system.fanSpeed === fanSpeed) {
-			return;
-		}
-
 		this.platform.izone.setFanSpeed(fanSpeed)
 			.catch( error => {
 				this.platform.log.error(`Unable to change fan speed: ${error}`);
@@ -213,21 +209,11 @@ export class SystemAccessory {
 
 	private setTargetTemperature(value: CharacteristicValue) {
 		const targetTemp = parseFloat(value.toString());
-		const promises: Promise<any>[] = [];
 
-		if (this.system.usesSystemSetpoint) {
-			promises.push(this.platform.izone.setTargetTemp(targetTemp));
-		} else {
-			for (const zone of this.system.zones) {
-				promises.push(this.platform.izone.setTargetTempForZone(targetTemp, zone.index));
-			}
-		}
-
-		return promises.reduce((p, promise) => {
-			return p.then(() => {
-				return promise;
+		this.platform.izone.setTargetTemp(targetTemp)
+			.catch( error => {
+				this.platform.log.error(`Unable to set target temperature: ${error}`);
 			});
-		}, Promise.resolve());
 	}
 
 

@@ -91,20 +91,17 @@ export class ZoneAccessory {
 	}
 
 	private setOn(value: CharacteristicValue) {
-		this.platform.log.debug(`${value}`);
-
 		if (value) {
-			this.platform.izone.openZone(this.zone.index)
+			this.platform.izone.setModeForZone(ZoneMode.open, this.zone.index)
 				.catch( error => {
-					this.platform.log.error(error);
+					this.platform.log.error(`Unable to open '${this.zone.name}' zone: ${error}`);
 				});
 		} else {
-			this.platform.izone.closeZone(this.zone.index)
+			this.platform.izone.setModeForZone(ZoneMode.close, this.zone.index)
 				.catch( error => {
-					this.platform.log.error(error);
+					this.platform.log.error(`Unable to close '${this.zone.name}' zone: ${error}`);
 				});
 		}
-
 	}
 
 	private getCurrentHeatingCoolingState(): CharacteristicValue {
@@ -148,14 +145,14 @@ export class ZoneAccessory {
 
 	private setTargetHeatingCoolingState(value: CharacteristicValue) {
 		if (value === this.platform.Characteristic.TargetHeatingCoolingState.OFF) {
-			this.platform.izone.closeZone(this.zone.index)
+			this.platform.izone.setModeForZone(ZoneMode.close, this.zone.index)
 				.catch( error => {
-					this.platform.log.error(`Unable to close ${this.zone.name}: ${error}`);
+					this.platform.log.error(`Unable to close '${this.zone.name}' zone: ${error}`);
 				});
 		} else {
-			this.platform.izone.setTargetTempForZone(this.zone.targetTemp, this.zone.index)
+			this.platform.izone.setModeForZone(ZoneMode.auto, this.zone.index)
 				.catch( error => {
-					this.platform.log.error(`Unable to set target temperature (${this.zone.targetTemp}°) for ${this.zone.name}: ${error}`);
+					this.platform.log.error(`Unable to set '${this.zone.name}' zone to climate control: ${error}`);
 				});
 		}
 	}
@@ -176,7 +173,7 @@ export class ZoneAccessory {
 
 		this.platform.izone.setTargetTempForZone(targetTemp, this.zone.index)
 			.catch( error => {
-				this.platform.log.error(`Unable to set target temperature (${targetTemp}°) for ${this.zone.name}: ${error}`);
+				this.platform.log.error(`Unable to set target temperature (${targetTemp}°) for '${this.zone.name}' zone: ${error}`);
 			});
 	}
 
